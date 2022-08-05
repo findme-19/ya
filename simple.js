@@ -37,7 +37,7 @@ var {
 
 /** @param {import('./connection').Socket} conn */
 export function HelperConnection(conn, options = {}) {
-	var botUser = conn.user || {}
+	var botUser = conn.user
 	/** @type {import('@adiwajshing/baileys').WASocket | import('@adiwajshing/baileys').WALegacySocket} */
 	var sock = Object.defineProperties(conn, {
 		decodeJid: {
@@ -95,13 +95,15 @@ export function HelperConnection(conn, options = {}) {
 			 */
 			async value(PATH, saveToFile = false) {
 				var res, filename
-				var data = Buffer.isBuffer(PATH) ? PATH : PATH instanceof ArrayBuffer ? PATH.toBuffer() : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split`,` [1], 'base64') : /^https?:\/\//.test(PATH) ? await (res = await fetch(PATH)).buffer() : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0)
+				var data = Buffer.isBuffer(PATH) ? PATH : PATH instanceof ArrayBuffer ? PATH.toBuffer() : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split`,` [1], 'base64') : /^https?:\/\//.test(PATH) ? (await (res = await fetch(PATH)).arrayBuffer()).toBuffer() : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0)
 				if (!Buffer.isBuffer(data)) throw new TypeError('Result is not a buffer')
 				var type = await fileTypeFromBuffer(data) || {
 					mime: 'application/octet-stream',
-					ext: '.bin'
+					ext: 'bin'
 				}
-				if (data && saveToFile && !filename)(filename = path.join(__dirname, '../tmp/' + new Date * 1 + '.' + type.ext), await fs.promises.writeFile(filename, data))
+				var name = res ? res.headers ? res.headers.get("content-disposition") ? res.headers.get('content-disposition').split("filename=")[1].replaceAll(/(\")/g, "") : new Date * 1 + '.' + type.ext : new Date * 1 + '.' + type.ext : new Date * 1 + '.' + type.ext
+				log(name)
+				if (data && saveToFile && !filename)(filename = path.join(__dirname, '../tmp/' + name), await fs.promises.writeFile(filename, data))
 				return {
 					res,
 					filename,
@@ -164,12 +166,12 @@ export function HelperConnection(conn, options = {}) {
 					}
 				}
 				var fileSize = fs.statSync(pathFile).size / 1024 / 1024
-				if (fileSize >= 20000) throw new Error('File size is too big!')
+				if (fileSize >= 100) throw new Error('File size is too big!')
 				var opt = {}
 				if (quoted) opt.quoted = quoted
 				if (!type) options.asDocument = true
 				var mtype = '',
-					mimetype = options.mimetype || type.mime,
+					mimetype = options.mimetype || type.res ? type.res.headers.get('content-type') : type.mime,
 					convert
 				if (/webp/.test(type.mime) || (/image/.test(type.mime) && options.asSticker)) mtype = 'sticker'
 				else if (/image/.test(type.mime) || (/webp/.test(type.mime) && options.asImage)) mtype = 'image'
@@ -179,7 +181,7 @@ export function HelperConnection(conn, options = {}) {
 					file = convert.data,
 					pathFile = convert.filename,
 					mtype = 'audio',
-					mimetype = options.mimetype || 'audio/ogg; codecs=opus'
+					mimetype = ptt ? 'audio/ogg; codecs=opus' : mimetype
 				)
 				else mtype = 'document'
 				if (options.asDocument) mtype = 'document'
@@ -248,7 +250,7 @@ VERSION:3.0
 N:;${name.replace(/\n/g, '\\n')};;;
 FN:${name.replace(/\n/g, '\\n')}
 TEL;type=CELL;type=VOICE;waid=${number}:${PhoneNumber('+' + number).getNumber('international')}${biz.description ? `
-X-WA-BIZ-NAME:${(Connection.store.getContact(njid)?.vname || conn.getName(njid) || name).replace(/\n/, '\\n')}
+X-WA-BIZ-NAME:${(conn.chats[njid]?.vname || conn.getName(njid) || name).replace(/\n/, '\\n')}
 X-WA-BIZ-DESCRIPTION:${biz.description.replace(/\n/g, '\\n')}
 `.trim() : ''}
 END:VCARD
@@ -366,8 +368,9 @@ END:VCARD
 				if (buffer) try {
 					(type = await conn.getFile(buffer), buffer = type.data)
 				} catch {
-					buffer = buffer
+					buffer = null
 				}
+				log(buffer, type)
 				if (buffer && !Buffer.isBuffer(buffer) && (typeof buffer === 'string' || Array.isArray(buffer)))(options = quoted, quoted = buttons, buttons = callText, callText = call, call = urlText, urlText = url, url = buffer, buffer = null)
 				if (!options) options = {}
 				var templateButtons = []
@@ -411,62 +414,57 @@ END:VCARD
 						})) || []
 					))
 				}
-				var message = {
-					...options,
-					[buffer ? 'caption' : 'text']: text || '',
-					footer,
-					templateButtons,
-					...(buffer ?
-						options.asLocation && /image/.test(type.mime) ? {
-							location: {
+				if (buffer && options.asLocation && /image/.test(type.mime)) {
+					var b = generateWAMessageFromContent(jid, proto.Message.fromObject({
+						templateMessage: {
+							hydratedTemplate: {
+								locationMessage: {
+									jpegThumbnail: buffer
+								},
+								hydratedContentText: text || '',
+								hydratedFooterText: footer,
 								...options,
-								jpegThumbnail: buffer
+								hydratedButtons: templateButtons
 							}
-						} : {
+						}
+					}), {
+						userJid: conn.user.jid,
+						quoted: quoted,
+						ephemeralExpiration: 86400,
+						...options
+					})
+					return await conn.relayMessage(jid, b.message, {
+						messageId: b.key.id
+					})
+				} else {
+				var mimetype = options.mimetype || type ? type.res ? type.res.headers.get('content-type') : type.mime : null
+					var message = {
+						...options,
+						[buffer ? 'caption' : 'text']: text || '',
+						footer,
+						templateButtons,
+						...(buffer ? {
 							[/video/.test(type.mime) ? 'video' : /image/.test(type.mime) ? 'image' : 'document']: buffer
 						} : {})
+					}
+					if(message.document) {
+					message = Object.assign(message,{
+							mimetype,
+							fileName: await say,
+							fileLength: 50000,
+							pageCount: 7000
+							})
+					}
+					log(message)
+					return await conn.sendMessage(jid, message, {
+						quoted,
+						upload: conn.waUploadToServer,
+						...options
+					})
 				}
-				return await conn.sendMessage(jid, message, {
-					quoted,
-					upload: conn.waUploadToServer,
-					...options
-				})
 			},
 			enumerable: true,
 			writable: true,
-		},
-		sendList: {
-			async value(jid, title, text, footer, buttonText, buffer, listSections, quoted, options) {
-				if (buffer) try {
-					(type = await conn.getFile(buffer), buffer = type.data)
-				} catch {
-					buffer = buffer
-				}
-				if (buffer && !Buffer.isBuffer(buffer) && (typeof buffer === 'string' || Array.isArray(buffer)))(options = quoted, quoted = listSections, listSections = buffer, buffer = null)
-				if (!options) options = {}
-				// send a list message!
-				var sections = listSections.map(([title, rows]) => ({
-					title: !nullish(title) && title || !nullish(rowTitle) && rowTitle || '',
-					rows: rows.map(([rowTitle, rowId, description]) => ({
-						title: !nullish(rowTitle) && rowTitle || !nullish(rowId) && rowId || '',
-						rowId: !nullish(rowId) && rowId || !nullish(rowTitle) && rowTitle || '',
-						description: !nullish(description) && description || ''
-					}))
-				}))
-
-				var listMessage = {
-					text,
-					footer,
-					title,
-					buttonText,
-					sections
-				}
-				return await conn.sendMessage(jid, listMessage, {
-					quoted,
-					upload: conn.waUploadToServer,
-					...options
-				})
-			}
 		},
 		cMod: {
 			/**
@@ -528,9 +526,9 @@ END:VCARD
 					)
 					message.message[vtype].contextInfo = message.message.viewOnceMessage.contextInfo
 				}
-				var mtype = getContentType(message.message)
+				var mtype = Object.keys(message.message)[0]
 				var m = generateForwardMessageContent(message, !!forwardingScore)
-				var ctype = getContentType(m)
+				var ctype = Object.keys(m)[0]
 				if (forwardingScore && typeof forwardingScore === 'number' && forwardingScore > 1) m[ctype].contextInfo.forwardingScore += forwardingScore
 				m[ctype].contextInfo = {
 					...(message.message[mtype].contextInfo || {}),
@@ -634,7 +632,7 @@ END:VCARD
 						vname: 'WhatsApp'
 					} : areJidsSameUser(jid, conn.user?.id || '') ?
 					conn.user :
-					(Connection.store.getContact(jid) || {})
+					(Connection.store.chats[jid] || {})
 				return (withoutContact ? '' : v.name) || v.subject || v.vname || v.notify || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
 			},
 			enumerable: true,
@@ -646,11 +644,8 @@ END:VCARD
 			 * @param {String} messageID 
 			 * @returns {import('@adiwajshing/baileys').proto.WebMessageInfo}
 			 */
-			value(jid, id) {
-				if (!jid && !id) return null
-				// if only 1 argument is passed, it is assumed to be a message id not a jid
-				if (jid && !id)[id, jid] = [jid, null]
-				return jid && id ? Connection.store.loadMessage(jid, id) : Connection.store.loadMessage(id)
+			value(messageID) {
+				return Connection.store.loadMessage(messageID)
 			},
 			enumerable: true,
 			writable: true,
@@ -675,7 +670,7 @@ END:VCARD
 						inviteExpiration: parseInt(inviteExpiration) || +new Date(new Date + (3 * 86400000)),
 						groupJid: jid,
 						groupName: (groupName ? groupName : await conn.getName(jid)) || null,
-						jpegThumbnail: Buffer.isBuffer(jpegThumbnail) ? jpegThumbnail.toString('base64') : null,
+						jpegThumbnail: Buffer.isBuffer(jpegThumbnail) ? jpegThumbnail : null,
 						caption
 					})
 				})
@@ -729,14 +724,14 @@ END:VCARD
 		} : {}),
 		user: {
 			get() {
-				Object.assign(botUser, conn.authState.creds.me || {})
+				botUser = conn.authState.creds.me || {}
 				return {
 					...botUser,
 					jid: botUser.id?.decodeJid?.() || botUser.id,
 				}
 			},
-			set(value) {
-				Object.assign(botUser, value)
+			set(v) {
+				botUser = v
 			},
 			enumerable: true,
 			configurable: true,
@@ -758,19 +753,15 @@ export function smsg(conn, m, hasParent) {
 	 */
 	var M = proto.WebMessageInfo
 	m = M.fromObject(m)
-	Object.defineProperty(m, 'conn', {
-		enumerable: false,
-		writable: true,
-		value: conn
-	})
+	m.conn = conn
 	var protocolMessageKey
 	if (m.message) {
 		if (m.mtype == 'protocolMessage' && m.msg.key) {
 			protocolMessageKey = m.msg.key
 			if (protocolMessageKey == 'status@broadcast') protocolMessageKey.remoteJid = m.chat
 			if (!protocolMessageKey.participant || protocolMessageKey.participant == 'status_me') protocolMessageKey.participant = m.sender
-			protocolMessageKey.fromMe = areJidsSameUser(protocolMessageKey.participant, conn.user.id)
-			if (!protocolMessageKey.fromMe && areJidsSameUser(protocolMessageKey.remoteJid, conn.user.id)) protocolMessageKey.remoteJid = m.sender
+			protocolMessageKey.fromMe = conn.decodeJid(protocolMessageKey.participant) === conn.decodeJid(conn.user.id)
+			if (!protocolMessageKey.fromMe && protocolMessageKey.remoteJid === conn.decodeJid(conn.user.id)) protocolMessageKey.remoteJid = m.sender
 		}
 		if (m.quoted)
 			if (!m.quoted.mediaMessage) delete m.quoted.download
@@ -778,9 +769,7 @@ export function smsg(conn, m, hasParent) {
 	if (!m.mediaMessage) delete m.download
 
 	try {
-		if (protocolMessageKey && m.mtype == 'protocolMessage') conn.ev.emit('messages.delete', {
-			keys: [protocolMessageKey]
-		})
+		if (protocolMessageKey && m.mtype == 'protocolMessage') conn.ev.emit('message.delete', protocolMessageKey)
 	} catch (e) {
 		console.error(e)
 	}
@@ -1155,7 +1144,7 @@ export function serialize() {
 		getQuotedObj: {
 			value() {
 				if (!this.quoted.id) return null
-				var q = proto.WebMessageInfo.fromObject(this.conn?.loadMessage(this.quoted.sender, this.quoted.id) || this.conn?.loadMessage(this.quoted.id) || this.quoted.vM)
+				var q = proto.WebMessageInfo.fromObject(this.conn?.loadMessage(this.quoted.id) || this.quoted.vM)
 				return smsg(this.conn, q)
 			},
 			enumerable: true
