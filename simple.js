@@ -20,11 +20,11 @@ import {
 } from 'url'
 import Connection from './connection.js'
 
-const __dirname = path.dirname(fileURLToPath(
+var __dirname = path.dirname(fileURLToPath(
 	import.meta.url))
 
 /** @type {import('@adiwajshing/baileys')} */
-const {
+var {
 	proto,
 	downloadContentFromMessage,
 	jidDecode,
@@ -37,9 +37,9 @@ const {
 
 /** @param {import('./connection').Socket} conn */
 export function HelperConnection(conn, options = {}) {
-	const botUser = conn.user || {}
+	var botUser = conn.user
 	/** @type {import('@adiwajshing/baileys').WASocket | import('@adiwajshing/baileys').WALegacySocket} */
-	let sock = Object.defineProperties(conn, {
+	var sock = Object.defineProperties(conn, {
 		decodeJid: {
 			value(jid) {
 				if (!jid || typeof jid !== 'string') return (!nullish(jid) && jid) || null
@@ -94,14 +94,16 @@ export function HelperConnection(conn, options = {}) {
 			 * @param {Boolean} saveToFile
 			 */
 			async value(PATH, saveToFile = false) {
-				let res, filename
-				const data = Buffer.isBuffer(PATH) ? PATH : PATH instanceof ArrayBuffer ? PATH.toBuffer() : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split`,` [1], 'base64') : /^https?:\/\//.test(PATH) ? await (res = await fetch(PATH)).buffer() : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0)
+				var res, filename
+				var data = Buffer.isBuffer(PATH) ? PATH : PATH instanceof ArrayBuffer ? PATH.toBuffer() : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split`,` [1], 'base64') : /^https?:\/\//.test(PATH) ? (await (res = await fetch(PATH)).arrayBuffer()).toBuffer() : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0)
 				if (!Buffer.isBuffer(data)) throw new TypeError('Result is not a buffer')
-				const type = await fileTypeFromBuffer(data) || {
+				var type = await fileTypeFromBuffer(data) || {
 					mime: 'application/octet-stream',
-					ext: '.bin'
+					ext: 'bin'
 				}
-				if (data && saveToFile && !filename)(filename = path.join(__dirname, '../tmp/' + new Date * 1 + '.' + type.ext), await fs.promises.writeFile(filename, data))
+				var name = res ? res.headers ? res.headers.get("content-disposition") ? res.headers.get('content-disposition').split("filename=")[1].replaceAll(/(\")/g, "") : new Date * 1 + '.' + type.ext : new Date * 1 + '.' + type.ext : new Date * 1 + '.' + type.ext
+				log(name)
+				if (data && saveToFile && !filename)(filename = path.join(__dirname, '../tmp/' + name), await fs.promises.writeFile(filename, data))
 				return {
 					res,
 					filename,
@@ -124,8 +126,8 @@ export function HelperConnection(conn, options = {}) {
 		//      */
 		//     value(eventName, is = () => true, maxTries = 25) { //Idk why this exist?
 		//         return new Promise((resolve, reject) => {
-		//             let tries = 0
-		//             let on = (...args) => {
+		//             var tries = 0
+		//             var on = (...args) => {
 		//                 if (++tries > maxTries) reject('Max tries reached')
 		//                 else if (is()) {
 		//                     conn.ev.off(eventName, on)
@@ -148,8 +150,8 @@ export function HelperConnection(conn, options = {}) {
 			 * @param {Object} options
 			 */
 			async value(jid, path, filename = '', caption = '', quoted, ptt = false, options = {}) {
-				let type = await conn.getFile(path, true)
-				let {
+				var type = await conn.getFile(path, true)
+				var {
 					res,
 					data: file,
 					filename: pathFile
@@ -163,13 +165,13 @@ export function HelperConnection(conn, options = {}) {
 						if (e.json) throw e.json
 					}
 				}
-				const fileSize = fs.statSync(pathFile).size / 1024 / 1024
-				if (fileSize >= 20000) throw new Error('File size is too big!')
-				let opt = {}
+				var fileSize = fs.statSync(pathFile).size / 1024 / 1024
+				if (fileSize >= 100) throw new Error('File size is too big!')
+				var opt = {}
 				if (quoted) opt.quoted = quoted
 				if (!type) options.asDocument = true
-				let mtype = '',
-					mimetype = options.mimetype || type.mime,
+				var mtype = '',
+					mimetype = options.mimetype || type.res ? type.res.headers.get('content-type') : type.mime,
 					convert
 				if (/webp/.test(type.mime) || (/image/.test(type.mime) && options.asSticker)) mtype = 'sticker'
 				else if (/image/.test(type.mime) || (/webp/.test(type.mime) && options.asImage)) mtype = 'image'
@@ -179,7 +181,7 @@ export function HelperConnection(conn, options = {}) {
 					file = convert.data,
 					pathFile = convert.filename,
 					mtype = 'audio',
-					mimetype = options.mimetype || 'audio/ogg; codecs=opus'
+					mimetype = ptt ? 'audio/ogg; codecs=opus' : mimetype
 				)
 				else mtype = 'document'
 				if (options.asDocument) mtype = 'document'
@@ -190,7 +192,7 @@ export function HelperConnection(conn, options = {}) {
 				delete options.asDocument
 				delete options.asImage
 
-				let message = {
+				var message = {
 					...options,
 					caption,
 					ptt,
@@ -203,7 +205,7 @@ export function HelperConnection(conn, options = {}) {
 				/**
 				 * @type {import('@adiwajshing/baileys').proto.WebMessageInfo}
 				 */
-				let m
+				var m
 				try {
 					m = await conn.sendMessage(jid, message, {
 						...opt,
@@ -237,18 +239,18 @@ export function HelperConnection(conn, options = {}) {
 			 */
 			async value(jid, data, quoted, options) {
 				if (!Array.isArray(data[0]) && typeof data[0] === 'string') data = [data]
-				let contacts = []
-				for (let [number, name] of data) {
+				var contacts = []
+				for (var [number, name] of data) {
 					number = number.replace(/[^0-9]/g, '')
-					let njid = number + '@s.whatsapp.net'
-					let biz = await conn.getBusinessProfile(njid).catch(_ => null) || {}
-					let vcard = `
+					var njid = number + '@s.whatsapp.net'
+					var biz = await conn.getBusinessProfile(njid).catch(_ => null) || {}
+					var vcard = `
 BEGIN:VCARD
 VERSION:3.0
 N:;${name.replace(/\n/g, '\\n')};;;
 FN:${name.replace(/\n/g, '\\n')}
 TEL;type=CELL;type=VOICE;waid=${number}:${PhoneNumber('+' + number).getNumber('international')}${biz.description ? `
-X-WA-BIZ-NAME:${(Connection.store.getContact(njid)?.vname || conn.getName(njid) || name).replace(/\n/, '\\n')}
+X-WA-BIZ-NAME:${(conn.chats[njid]?.vname || conn.getName(njid) || name).replace(/\n/, '\\n')}
 X-WA-BIZ-DESCRIPTION:${biz.description.replace(/\n/g, '\\n')}
 `.trim() : ''}
 END:VCARD
@@ -307,7 +309,7 @@ END:VCARD
 			 * @param {Object} options
 			 */
 			async value(jid, text = '', footer = '', buffer, buttons, quoted, options) {
-				let type
+				var type
 				if (Array.isArray(buffer))(options = quoted, quoted = buttons, buttons = buffer, buffer = null)
 				else if (buffer) try {
 					(type = await conn.getFile(buffer), buffer = type.data)
@@ -316,7 +318,7 @@ END:VCARD
 				}
 				if (!Array.isArray(buttons[0]) && typeof buttons[0] === 'string') buttons = [buttons]
 				if (!options) options = {}
-				let message = {
+				var message = {
 					...options,
 					[buffer ? 'caption' : 'text']: text || '',
 					footer,
@@ -362,15 +364,16 @@ END:VCARD
 			 * @param {Object} options
 			 */
 			async value(jid, text = '', footer = '', buffer, url, urlText, call, callText, buttons, quoted, options) {
-				let type
+				var type
 				if (buffer) try {
 					(type = await conn.getFile(buffer), buffer = type.data)
 				} catch {
-					buffer = buffer
+					buffer = null
 				}
+				log(buffer, type)
 				if (buffer && !Buffer.isBuffer(buffer) && (typeof buffer === 'string' || Array.isArray(buffer)))(options = quoted, quoted = buttons, buttons = callText, callText = call, call = urlText, urlText = url, url = buffer, buffer = null)
 				if (!options) options = {}
-				let templateButtons = []
+				var templateButtons = []
 				if (url || urlText) {
 					if (!Array.isArray(url)) url = [url]
 					if (!Array.isArray(urlText)) urlText = [urlText]
@@ -411,62 +414,57 @@ END:VCARD
 						})) || []
 					))
 				}
-				let message = {
-					...options,
-					[buffer ? 'caption' : 'text']: text || '',
-					footer,
-					templateButtons,
-					...(buffer ?
-						options.asLocation && /image/.test(type.mime) ? {
-							location: {
+				if (buffer && options.asLocation && /image/.test(type.mime)) {
+					var b = generateWAMessageFromContent(jid, proto.Message.fromObject({
+						templateMessage: {
+							hydratedTemplate: {
+								locationMessage: {
+									jpegThumbnail: buffer
+								},
+								hydratedContentText: text || '',
+								hydratedFooterText: footer,
 								...options,
-								jpegThumbnail: buffer
+								hydratedButtons: templateButtons
 							}
-						} : {
+						}
+					}), {
+						userJid: conn.user.jid,
+						quoted: quoted,
+						ephemeralExpiration: 86400,
+						...options
+					})
+					return await conn.relayMessage(jid, b.message, {
+						messageId: b.key.id
+					})
+				} else {
+				var mimetype = options.mimetype || type ? type.res ? type.res.headers.get('content-type') : type.mime : null
+					var message = {
+						...options,
+						[buffer ? 'caption' : 'text']: text || '',
+						footer,
+						templateButtons,
+						...(buffer ? {
 							[/video/.test(type.mime) ? 'video' : /image/.test(type.mime) ? 'image' : 'document']: buffer
 						} : {})
+					}
+					if(message.document) {
+					message = Object.assign(message,{
+							mimetype,
+							fileName: await say,
+							fileLength: 50000,
+							pageCount: 7000
+							})
+					}
+					log(message)
+					return await conn.sendMessage(jid, message, {
+						quoted,
+						upload: conn.waUploadToServer,
+						...options
+					})
 				}
-				return await conn.sendMessage(jid, message, {
-					quoted,
-					upload: conn.waUploadToServer,
-					...options
-				})
 			},
 			enumerable: true,
 			writable: true,
-		},
-		sendList: {
-			async value(jid, title, text, footer, buttonText, buffer, listSections, quoted, options) {
-				if (buffer) try {
-					(type = await conn.getFile(buffer), buffer = type.data)
-				} catch {
-					buffer = buffer
-				}
-				if (buffer && !Buffer.isBuffer(buffer) && (typeof buffer === 'string' || Array.isArray(buffer)))(options = quoted, quoted = listSections, listSections = buffer, buffer = null)
-				if (!options) options = {}
-				// send a list message!
-				const sections = listSections.map(([title, rows]) => ({
-					title: !nullish(title) && title || !nullish(rowTitle) && rowTitle || '',
-					rows: rows.map(([rowTitle, rowId, description]) => ({
-						title: !nullish(rowTitle) && rowTitle || !nullish(rowId) && rowId || '',
-						rowId: !nullish(rowId) && rowId || !nullish(rowTitle) && rowTitle || '',
-						description: !nullish(description) && description || ''
-					}))
-				}))
-
-				const listMessage = {
-					text,
-					footer,
-					title,
-					buttonText,
-					sections
-				}
-				return await conn.sendMessage(jid, listMessage, {
-					quoted,
-					upload: conn.waUploadToServer,
-					...options
-				})
-			}
 		},
 		cMod: {
 			/**
@@ -480,12 +478,12 @@ END:VCARD
 			 */
 			value(jid, message, text = '', sender = conn.user.jid, options = {}) {
 				if (options.mentions && !Array.isArray(options.mentions)) options.mentions = [options.mentions]
-				let copy = message.toJSON()
+				var copy = message.toJSON()
 				delete copy.message.messageContextInfo
 				delete copy.message.senderKeyDistributionMessage
-				let mtype = Object.keys(copy.message)[0]
-				let msg = copy.message
-				let content = msg[mtype]
+				var mtype = Object.keys(copy.message)[0]
+				var msg = copy.message
+				var content = msg[mtype]
 				if (typeof content === 'string') msg[mtype] = text || content
 				else if (content.caption) content.caption = text || content.caption
 				else if (content.text) content.text = text || content.text
@@ -519,7 +517,7 @@ END:VCARD
 			 * @param {Object} options
 			 */
 			async value(jid, message, forwardingScore = true, options = {}) {
-				let vtype
+				var vtype
 				if (options.readViewOnce && message.message.viewOnceMessage?.message) {
 					vtype = Object.keys(message.message.viewOnceMessage.message)[0]
 					delete message.message.viewOnceMessage.message[vtype].viewOnce
@@ -528,9 +526,9 @@ END:VCARD
 					)
 					message.message[vtype].contextInfo = message.message.viewOnceMessage.contextInfo
 				}
-				let mtype = getContentType(message.message)
-				let m = generateForwardMessageContent(message, !!forwardingScore)
-				let ctype = getContentType(m)
+				var mtype = Object.keys(message.message)[0]
+				var m = generateForwardMessageContent(message, !!forwardingScore)
+				var ctype = Object.keys(m)[0]
 				if (forwardingScore && typeof forwardingScore === 'number' && forwardingScore > 1) m[ctype].contextInfo.forwardingScore += forwardingScore
 				m[ctype].contextInfo = {
 					...(message.message[mtype].contextInfo || {}),
@@ -587,11 +585,11 @@ END:VCARD
 			 * @returns {Promise<fs.PathLike | fs.promises.FileHandle | Buffer>}
 			 */
 			async value(m, type, saveToFile) {
-				let filename
+				var filename
 				if (!m || !(m.url || m.directPath)) return Buffer.alloc(0)
-				const stream = await downloadContentFromMessage(m, type)
-				let buffer = Buffer.from([])
-				for await (const chunk of stream) {
+				var stream = await downloadContentFromMessage(m, type)
+				var buffer = Buffer.from([])
+				for await (var chunk of stream) {
 					buffer = Buffer.concat([buffer, chunk])
 				}
 				if (saveToFile)({
@@ -623,7 +621,7 @@ END:VCARD
 			value(jid = '', withoutContact = false) {
 				jid = conn.decodeJid(jid)
 				withoutContact = conn.withoutContact || withoutContact
-				let v
+				var v
 				if (jid.endsWith('@g.us')) return (async () => {
 					v = await Connection.store.fetchGroupMetadata(jid, conn.groupMetadata) || {}
 					return (v.name || v.subject || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international'))
@@ -634,7 +632,7 @@ END:VCARD
 						vname: 'WhatsApp'
 					} : areJidsSameUser(jid, conn.user?.id || '') ?
 					conn.user :
-					(Connection.store.getContact(jid) || {})
+					(Connection.store.chats[jid] || {})
 				return (withoutContact ? '' : v.name) || v.subject || v.vname || v.notify || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
 			},
 			enumerable: true,
@@ -646,11 +644,8 @@ END:VCARD
 			 * @param {String} messageID 
 			 * @returns {import('@adiwajshing/baileys').proto.WebMessageInfo}
 			 */
-			value(jid, id) {
-				if (!jid && !id) return null
-				// if only 1 argument is passed, it is assumed to be a message id not a jid
-				if (jid && !id)[id, jid] = [jid, null]
-				return jid && id ? Connection.store.loadMessage(jid, id) : Connection.store.loadMessage(id)
+			value(messageID) {
+				return Connection.store.loadMessage(messageID)
 			},
 			enumerable: true,
 			writable: true,
@@ -669,17 +664,17 @@ END:VCARD
 			 * @param {*} options 
 			 */
 			async value(jid, participant, inviteCode, inviteExpiration, groupName = 'unknown subject', caption = 'Invitation to join my WhatsApp group', jpegThumbnail, options = {}) {
-				const msg = proto.Message.fromObject({
+				var msg = proto.Message.fromObject({
 					groupInviteMessage: proto.GroupInviteMessage.fromObject({
 						inviteCode,
 						inviteExpiration: parseInt(inviteExpiration) || +new Date(new Date + (3 * 86400000)),
 						groupJid: jid,
 						groupName: (groupName ? groupName : await conn.getName(jid)) || null,
-						jpegThumbnail: Buffer.isBuffer(jpegThumbnail) ? jpegThumbnail.toString('base64') : null,
+						jpegThumbnail: Buffer.isBuffer(jpegThumbnail) ? jpegThumbnail : null,
 						caption
 					})
 				})
-				const message = generateWAMessageFromContent(participant, msg, options)
+				var message = generateWAMessageFromContent(participant, msg, options)
 				await conn.relayMessage(participant, message.message, {
 					messageId: message.key.id,
 					additionalAttributes: {
@@ -729,14 +724,14 @@ END:VCARD
 		} : {}),
 		user: {
 			get() {
-				Object.assign(botUser, conn.authState.creds.me || {})
+				botUser = conn.authState.creds.me || {}
 				return {
 					...botUser,
 					jid: botUser.id?.decodeJid?.() || botUser.id,
 				}
 			},
-			set(value) {
-				Object.assign(botUser, value)
+			set(v) {
+				botUser = v
 			},
 			enumerable: true,
 			configurable: true,
@@ -756,21 +751,17 @@ export function smsg(conn, m, hasParent) {
 	/**
 	 * @type {import('@adiwajshing/baileys').proto.WebMessageInfo}
 	 */
-	let M = proto.WebMessageInfo
+	var M = proto.WebMessageInfo
 	m = M.fromObject(m)
-	Object.defineProperty(m, 'conn', {
-		enumerable: false,
-		writable: true,
-		value: conn
-	})
-	let protocolMessageKey
+	m.conn = conn
+	var protocolMessageKey
 	if (m.message) {
 		if (m.mtype == 'protocolMessage' && m.msg.key) {
 			protocolMessageKey = m.msg.key
 			if (protocolMessageKey == 'status@broadcast') protocolMessageKey.remoteJid = m.chat
 			if (!protocolMessageKey.participant || protocolMessageKey.participant == 'status_me') protocolMessageKey.participant = m.sender
-			protocolMessageKey.fromMe = areJidsSameUser(protocolMessageKey.participant, conn.user.id)
-			if (!protocolMessageKey.fromMe && areJidsSameUser(protocolMessageKey.remoteJid, conn.user.id)) protocolMessageKey.remoteJid = m.sender
+			protocolMessageKey.fromMe = conn.decodeJid(protocolMessageKey.participant) === conn.decodeJid(conn.user.id)
+			if (!protocolMessageKey.fromMe && protocolMessageKey.remoteJid === conn.decodeJid(conn.user.id)) protocolMessageKey.remoteJid = m.sender
 		}
 		if (m.quoted)
 			if (!m.quoted.mediaMessage) delete m.quoted.download
@@ -778,9 +769,7 @@ export function smsg(conn, m, hasParent) {
 	if (!m.mediaMessage) delete m.download
 
 	try {
-		if (protocolMessageKey && m.mtype == 'protocolMessage') conn.ev.emit('messages.delete', {
-			keys: [protocolMessageKey]
-		})
+		if (protocolMessageKey && m.mtype == 'protocolMessage') conn.ev.emit('message.delete', protocolMessageKey)
 	} catch (e) {
 		console.error(e)
 	}
@@ -789,7 +778,7 @@ export function smsg(conn, m, hasParent) {
 
 // https://github.com/Nurutomo/wabot-aq/issues/490
 export function serialize() {
-	const MediaType = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage', 'documentMessage']
+	var MediaType = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage', 'documentMessage']
 	return Object.defineProperties(proto.WebMessageInfo.prototype, {
 		conn: {
 			value: global.conn,
@@ -808,7 +797,7 @@ export function serialize() {
 		},
 		chat: {
 			get() {
-				const senderKeyDistributionMessage = this.message?.senderKeyDistributionMessage?.groupId
+				var senderKeyDistributionMessage = this.message?.senderKeyDistributionMessage?.groupId
 				return (
 					this.key?.remoteJid ||
 					(senderKeyDistributionMessage &&
@@ -850,18 +839,18 @@ export function serialize() {
 		mediaMessage: {
 			get() {
 				if (!this.message) return null
-				const Message = ((this.msg?.url || this.msg?.directPath) ? {
+				var Message = ((this.msg?.url || this.msg?.directPath) ? {
 					...this.message
 				} : extractMessageContent(this.message)) || null
 				if (!Message) return null
-				const mtype = Object.keys(Message)[0]
+				var mtype = Object.keys(Message)[0]
 				return MediaType.includes(mtype) ? Message : null
 			},
 			enumerable: true
 		},
 		mediaType: {
 			get() {
-				let message
+				var message
 				if (!(message = this.mediaMessage)) return null
 				return Object.keys(message)[0]
 			},
@@ -870,14 +859,14 @@ export function serialize() {
 		quoted: {
 			get() {
 				/** @type {ReturnType<typeof makeWASocket>} */
-				const self = this
-				const msg = self.msg
-				const contextInfo = msg?.contextInfo
-				const quoted = contextInfo?.quotedMessage
+				var self = this
+				var msg = self.msg
+				var contextInfo = msg?.contextInfo
+				var quoted = contextInfo?.quotedMessage
 				if (!msg || !contextInfo || !quoted) return null
-				const type = getContentType(quoted)
-				let q = quoted[type]
-				const text = typeof q === 'string' ? q : q.text
+				var type = getContentType(quoted)
+				var q = quoted[type]
+				var text = typeof q === 'string' ? q : q.text
 				return Object.defineProperties(JSON.parse(JSON.stringify(typeof q === 'string' ? {
 					text: q
 				} : q)), {
@@ -889,18 +878,18 @@ export function serialize() {
 					},
 					mediaMessage: {
 						get() {
-							const Message = ((q.url || q.directPath) ? {
+							var Message = ((q.url || q.directPath) ? {
 								...quoted
 							} : extractMessageContent(quoted)) || null
 							if (!Message) return null
-							const mtype = Object.keys(Message)[0]
+							var mtype = Object.keys(Message)[0]
 							return MediaType.includes(mtype) ? Message : null
 						},
 						enumerable: true
 					},
 					mediaType: {
 						get() {
-							let message
+							var message
 							if (!(message = this.mediaMessage)) return null
 							return Object.keys(message)[0]
 						},
@@ -950,7 +939,7 @@ export function serialize() {
 					},
 					name: {
 						get() {
-							const sender = this.sender
+							var sender = this.sender
 							return sender ? self.conn?.getName(sender) : null
 						},
 						enumerable: true
@@ -978,7 +967,7 @@ export function serialize() {
 					},
 					download: {
 						value(saveToFile = false) {
-							const mtype = this.mediaType
+							var mtype = this.mediaType
 							return self.conn?.downloadM(this.mediaMessage[mtype], mtype.replace(/message/i, ''), saveToFile)
 						},
 						enumerable: true,
@@ -1001,7 +990,7 @@ export function serialize() {
 						 * Copy quoted message
 						 */
 						value() {
-							const M = proto.WebMessageInfo
+							var M = proto.WebMessageInfo
 							return smsg(conn, M.fromObject(M.toObject(this.vM)))
 						},
 						enumerable: true,
@@ -1083,8 +1072,8 @@ export function serialize() {
 		},
 		text: {
 			get() {
-				const msg = this.msg
-				const text = (typeof msg === 'string' ? msg : msg?.text) || msg?.caption || msg?.contentText || ''
+				var msg = this.msg
+				var text = (typeof msg === 'string' ? msg : msg?.text) || msg?.caption || msg?.contentText || ''
 				return typeof this._text === 'string' ? this._text : '' || (typeof text === 'string' ? text : (
 					text?.selectedDisplayText ||
 					text?.hydratedTemplate?.hydratedContentText ||
@@ -1110,7 +1099,7 @@ export function serialize() {
 		},
 		download: {
 			value(saveToFile = false) {
-				const mtype = this.mediaType
+				var mtype = this.mediaType
 				return this.conn?.downloadM(this.mediaMessage[mtype], mtype.replace(/message/i, ''), saveToFile)
 			},
 			enumerable: true,
@@ -1123,7 +1112,7 @@ export function serialize() {
 		},
 		copy: {
 			value() {
-				const M = proto.WebMessageInfo
+				var M = proto.WebMessageInfo
 				return smsg(this.conn, M.fromObject(M.toObject(this)))
 			},
 			enumerable: true
@@ -1155,7 +1144,7 @@ export function serialize() {
 		getQuotedObj: {
 			value() {
 				if (!this.quoted.id) return null
-				const q = proto.WebMessageInfo.fromObject(this.conn?.loadMessage(this.quoted.sender, this.quoted.id) || this.conn?.loadMessage(this.quoted.id) || this.quoted.vM)
+				var q = proto.WebMessageInfo.fromObject(this.conn?.loadMessage(this.quoted.id) || this.quoted.vM)
 				return smsg(this.conn, q)
 			},
 			enumerable: true
@@ -1189,16 +1178,16 @@ export function serialize() {
 
 export function logic(check, inp, out) {
 	if (inp.length !== out.length) throw new Error('Input and Output must have same length')
-	for (let i in inp)
+	for (var i in inp)
 		if (util.isDeepStrictEqual(check, inp[i])) return out[i]
 	return null
 }
 
 export function protoType() {
 	Buffer.prototype.toArrayBuffer = function toArrayBufferV2() {
-		const ab = new ArrayBuffer(this.length);
-		const view = new Uint8Array(ab);
-		for (let i = 0; i < this.length; ++i) {
+		var ab = new ArrayBuffer(this.length);
+		var view = new Uint8Array(ab);
+		for (var i = 0; i < this.length; ++i) {
 			view[i] = this[i];
 		}
 		return ab;
@@ -1239,12 +1228,12 @@ export function protoType() {
 	 * @returns {String}
 	 */
 	String.prototype.capitalizeV2 = function capitalizeV2() {
-		const str = this.split(' ')
+		var str = this.split(' ')
 		return str.map(v => v.capitalize()).join(' ')
 	}
 	String.prototype.decodeJid = function decodeJid() {
 		if (/:\d+@/gi.test(this)) {
-			const decode = jidDecode(this) || {}
+			var decode = jidDecode(this) || {}
 			return (decode.user && decode.server && decode.user + '@' + decode.server || this).trim()
 		} else return this.trim()
 	}
@@ -1253,11 +1242,11 @@ export function protoType() {
 	 * @returns {string}
 	 */
 	Number.prototype.toTimeString = function toTimeString() {
-		// const milliseconds = this % 1000
-		const seconds = Math.floor((this / 1000) % 60)
-		const minutes = Math.floor((this / (60 * 1000)) % 60)
-		const hours = Math.floor((this / (60 * 60 * 1000)) % 24)
-		const days = Math.floor((this / (24 * 60 * 60 * 1000)))
+		// var milliseconds = this % 1000
+		var seconds = Math.floor((this / 1000) % 60)
+		var minutes = Math.floor((this / (60 * 1000)) % 60)
+		var hours = Math.floor((this / (60 * 60 * 1000)) % 24)
+		var days = Math.floor((this / (24 * 60 * 60 * 1000)))
 		return (
 			(days ? `${days} day(s) ` : '') +
 			(hours ? `${hours} hour(s) ` : '') +
@@ -1270,7 +1259,7 @@ export function protoType() {
 
 
 function isNumber() {
-	const int = parseInt(this)
+	var int = parseInt(this)
 	return typeof int === 'number' && !isNaN(int)
 }
 
